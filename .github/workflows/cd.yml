@@ -1,0 +1,48 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: ["master"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install dependencies
+        run: composer install --verbose --prefer-dist --no-progress --no-interaction --optimize-autoloader --no-dev
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v3.6.0
+
+      - run: npm i && npm run build
+
+      - name: ssh deploy
+        uses: easingthemes/ssh-deploy@v4.0.5
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.HOST }}
+          REMOTE_USER: ${{ secrets.USER }}
+          REMOTE_PORT: ${{ secrets.PORT }}
+          TARGET: ${{ secrets.REMOTE_PATH }}
+          EXCLUDE: /node_modules/
+          ARGS: --delete --exclude=/.env --exclude=/database/database.sqlite
+          SCRIPT_BEFORE: ls && cd ${{ secrets.REMOTE_PATH }} && php artisan down --refresh=15 --render="errors::503" && php artisan config:clear && php artisan view:clear
+          SCRIPT_AFTER: cd ${{ secrets.REMOTE_PATH }} && php artisan migrate --force && php artisan config:cache && php artisan view:cache && php artisan up
