@@ -1,4 +1,4 @@
-See [TheBlckbird/Rave](https://github.com/TheBlckbird/Rave)
+See [TheBlckbird/Echobyte](https://github.com/TheBlckbird/Echobyte)
 
 #### Note
 
